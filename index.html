@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudioArchitect | Design Workspace</title>
+    <style>
+        :root { --gold: #C5A059; --dark: #121212; --border: #333; --panel: #1e1e1e; }
+        body { font-family: 'Inter', sans-serif; margin: 0; background: #000; color: #fff; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Side Panel / Tools */
+        .sidebar { width: 350px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 100; padding: 20px; box-sizing: border-box; overflow-y: auto; }
+        
+        /* WORKSPACE VIEWPORT */
+        .viewport { flex-grow: 1; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: grab; }
+        .viewport:active { cursor: grabbing; }
+        
+        .canvas-wrapper { position: relative; transform-origin: center center; transition: transform 0.1s ease-out; }
+        #blueprint-display { display: block; box-shadow: 0 0 50px rgba(0,0,0,0.8); pointer-events: none; }
+        canvas { position: absolute; top: 0; left: 0; z-index: 10; pointer-events: none; }
+
+        /* Editing Tools UI */
+        h2 { font-size: 14px; letter-spacing: 2px; text-transform: uppercase; color: var(--gold); margin-bottom: 25px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .tool-section { margin-bottom: 20px; background: #252525; padding: 15px; border-radius: 8px; }
+        label { display: flex; justify-content: space-between; font-size: 10px; text-transform: uppercase; color: #888; margin-bottom: 8px; font-weight: 700; }
+        label span { color: var(--gold); }
+        
+        input[type="range"] { width: 100%; accent-color: var(--gold); margin-bottom: 15px; cursor: pointer; }
+        input[type="number"], select, input[type="color"] { width: 100%; background: #111; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px; font-size: 12px; margin-bottom: 10px; }
+        
+        .asset-grid { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 15px; padding-bottom: 5px; }
+        .asset-thumb { width: 50px; height: 50px; border-radius: 4px; cursor: pointer; border: 2px solid transparent; background: #333; }
+        .asset-thumb.active { border-color: var(--gold); }
+        
+        .zoom-badge { position: absolute; bottom: 20px; right: 20px; background: rgba(0,0,0,0.8); padding: 5px 15px; border-radius: 20px; border: 1px solid var(--gold); font-size: 12px; color: var(--gold); z-index: 200; }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h2>Studio Tools</h2>
+
+    <div class="tool-section">
+        <label>1. Assets & View</label>
+        <div class="asset-grid" id="assetGrid">
+            <div class="asset-thumb" style="display:flex;align-items:center;justify-content:center;border:1px dashed var(--gold);color:var(--gold)" onclick="document.getElementById('fileIn').click()">+</div>
+        </div>
+        <input type="file" id="fileIn" hidden multiple accept="image/*" onchange="loadImages(event)">
+        <label>Zoom Level <span id="valZoom">100%</span></label>
+        <input type="range" id="zoom" min="0.2" max="3" step="0.1" value="1" oninput="applyView()">
+        <label>Overlay Opacity <span id="valOpac">50%</span></label>
+        <input type="range" id="opac" min="0" max="1" step="0.1" value="0.5" oninput="draw()">
+    </div>
+
+    <div class="tool-section">
+        <label>2. Flooring Specs</label>
+        <select id="pattern" onchange="draw()">
+            <option value="stack">Stack Bond</option>
+            <option value="brick">Brick Offset (50%)</option>
+            <option value="herringbone">Herringbone</option>
+            <option value="chevron">Chevron</option>
+        </select>
+        <label>Grout Color</label>
+        <input type="color" id="groutColor" value="#000000" oninput="draw()">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div><label>Tile W (in)</label><input type="number" id="tW" value="12" oninput="draw()"></div>
+            <div><label>Tile H (in)</label><input type="number" id="tH" value="24" oninput="draw()"></div>
+        </div>
+    </div>
+
+    <div class="tool-section">
+        <label>3. Geometry & Angle</label>
+        <label>Rotation <span id="valRot">0°</span></label>
+        <input type="range" id="rot" min="0" max="360" value="0" oninput="draw()">
+        <label>Nudge Grid X</label>
+        <input type="range" id="offX" min="-300" max="300" value="0" oninput="draw()">
+        <label>Nudge Grid Y</label>
+        <input type="range" id="offY" min="-300" max="300" value="0" oninput="draw()">
+    </div>
+</div>
+
+<div class="viewport" id="viewport">
+    <div class="canvas-wrapper" id="wrapper">
+        <img id="blueprint-display" src="" alt="">
+        <canvas id="canvas"></canvas>
+    </div>
+    <div class="zoom-badge" id="zoomBadge">Zoom: 100%</div>
+</div>
+
+<script>
+    const wrapper = document.getElementById('wrapper');
+    const display = document.getElementById('blueprint-display');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Zoom/Pan State
+    let zoom = 1;
+
+    function loadImages(e) {
+        const files = Array.from(e.target.files);
+        files.forEach((file, idx) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const thumb = document.createElement('img');
+                thumb.src = ev.target.result;
+                thumb.className = 'asset-thumb';
+                thumb.onclick = () => {
+                    display.src = thumb.src;
+                    document.querySelectorAll('.asset-thumb').forEach(t => t.classList.remove('active'));
+                    thumb.classList.add('active');
+                };
+                document.getElementById('assetGrid').appendChild(thumb);
+                if (idx === 0) { 
+                    display.src = ev.target.result;
+                    thumb.classList.add('active');
+                }
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    display.onload = () => {
+        canvas.width = display.width;
+        canvas.height = display.height;
+        draw();
+    };
+
+    function applyView() {
+        zoom = document.getElementById('zoom').value;
+        wrapper.style.transform = `scale(${zoom})`;
+        document.getElementById('valZoom').innerText = Math.round(zoom * 100) + "%";
+        document.getElementById('zoomBadge').innerText = "Zoom: " + Math.round(zoom * 100) + "%";
+    }
+
+    function draw() {
+        if (!display.src) return;
+        
+        const tw = parseFloat(document.getElementById('tW').value) || 12;
+        const th = parseFloat(document.getElementById('tH').value) || 12;
+        const rot = parseFloat(document.getElementById('rot').value) || 0;
+        const pat = document.getElementById('pattern').value;
+        const ox = parseFloat(document.getElementById('offX').value) || 0;
+        const oy = parseFloat(document.getElementById('offY').value) || 0;
+        const grout = document.getElementById('groutColor').value;
+        
+        document.getElementById('valRot').innerText = rot + "°";
+        document.getElementById('valOpac').innerText = Math.round(document.getElementById('opac').value * 100) + "%";
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        
+        // Settings for a "Standard Room" scale relative to the image
+        const scale = (canvas.width * 0.4) / 20; // Default 20ft scale
+        const twp = (tw / 12) * scale;
+        const thp = (th / 12) * scale;
+        
+        ctx.globalAlpha = document.getElementById('opac').value;
+        ctx.strokeStyle = grout;
+        ctx.lineWidth = 1;
+
+        // Center pattern and apply transforms
+        ctx.translate(canvas.width/2 + ox, canvas.height/2 + oy);
+        ctx.rotate(rot * Math.PI / 180);
+
+        const b = Math.max(canvas.width, canvas.height) * 2;
+
+        if (pat === 'herringbone') {
+            for (let x = -b; x < b; x += thp) {
+                for (let y = -b; y < b; y += thp) {
+                    ctx.save(); ctx.translate(x, y);
+                    ctx.strokeRect(0, 0, twp, thp);
+                    ctx.rotate(Math.PI / 2); ctx.strokeRect(0, -twp, thp, twp);
+                    ctx.restore();
+                }
+            }
+        } else if (pat === 'chevron') {
+            
+            for(let x = -b; x < b; x += twp) {
+                for(let y = -b; y < b; y += thp) {
+                    ctx.beginPath();
+                    if(Math.floor(x/twp)%2==0) { 
+                        ctx.moveTo(x,y); ctx.lineTo(x+twp, y+thp/2); ctx.lineTo(x, y+thp); 
+                    } else { 
+                        ctx.moveTo(x+twp,y); ctx.lineTo(x, y+thp/2); ctx.lineTo(x+twp, y+thp); 
+                    }
+                    ctx.stroke();
+                }
+            }
+        } else {
+            let row = 0;
+            for (let y = -b; y < b; y += thp) {
+                let shift = (pat === 'brick' && row % 2 !== 0) ? twp/2 : 0;
+                for (let x = -b; x < b; x += twp) {
+                    ctx.strokeRect(x + shift, y, twp, thp);
+                }
+                row++;
+            }
+        }
+        ctx.restore();
+    }
+</script>
+</body>
+</html>
