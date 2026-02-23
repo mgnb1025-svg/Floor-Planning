@@ -1,0 +1,15 @@
+{
+  "name": "tile-architect-ai-pro",
+  "version": "1.0.0",
+  "description": "AI-Powered Flooring Layout and Waste Optimizer",
+  "author": "Your Name",
+  "license": "Proprietary",
+  "dependencies": {
+    "@capacitor/core": "^5.0.0",
+    "@capacitor/ios": "^5.0.0",
+    "@capacitor/android": "^5.0.0"
+  },
+  "scripts": {
+    "start": "npx static-server"
+  }
+}
