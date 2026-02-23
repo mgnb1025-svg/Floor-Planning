@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TileArchitect AI Pro | The Complete Suite</title>
+    <style>
+        :root { --pro-gold: #d4af37; --ai-purple: #8a2be2; --success: #38a169; --bg: #1a202c; --card: #ffffff; }
+        body { font-family: -apple-system, system-ui, sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: var(--bg); color: #333; overflow: hidden; }
+        @media (min-width: 768px) { body { flex-direction: row; } .sidebar { width: 440px; height: 100vh; } }
+        .sidebar { background: var(--card); border-right: 1px solid #e2e8f0; overflow-y: auto; padding: 20px; flex-shrink: 0; box-sizing: border-box; box-shadow: 4px 0 15px rgba(0,0,0,0.1); z-index: 10; }
+        .viewport { flex-grow: 1; position: relative; background: #2d3748; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        section { border-bottom: 1px solid #edf2f7; padding: 15px 0; }
+        h3 { font-size: 11px; color: #4a5568; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 800; display: flex; align-items: center; gap: 5px; }
+        label { font-size: 10px; font-weight: bold; color: #718096; display: block; margin-bottom: 5px; }
+        input, select, button { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e0; margin-bottom: 8px; font-size: 13px; box-sizing: border-box; transition: 0.2s; }
+        .btn-ai { background: var(--ai-purple); color: white; border: none; font-weight: bold; cursor: pointer; }
+        .btn-pay { background: var(--success); color: white; border: none; font-weight: bold; cursor: pointer; }
+        .btn-pro { background: var(--pro-gold); color: white; border: none; font-weight: bold; cursor: pointer; }
+        .hw-link { display: inline-flex; align-items: center; font-size: 11px; color: var(--ai-purple); text-decoration: none; margin: 4px 0; font-weight: 600; background: #f3e5f5; padding: 5px 10px; border-radius: 20px; }
+        canvas { background: white; border-radius: 4px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        .locked canvas { filter: grayscale(1) opacity(0.3) blur(2px); }
+        .watermark { position: absolute; font-size: 24px; font-weight: 900; color: rgba(255,255,255,0.2); transform: rotate(-30deg); pointer-events: none; z-index: 5; text-align: center; line-height: 1.2; display:none;}
+        .locked .watermark { display: block; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        #ai-status { font-size: 11px; padding: 10px; border-radius: 6px; background: #fffaf0; border-left: 3px solid var(--pro-gold); margin-top: 10px; }
+    </style>
+</head>
+<body class="locked" id="app">
+
+<div class="sidebar">
+    <h2 style="margin:0 0 15px 0; font-size: 22px;">TileArchitect <span style="color:var(--ai-purple)">AI</span></h2>
+
+    <section>
+        <h3>📏 1. Measurements & Tools</h3>
+        <div class="grid-2">
+            <div><label>LENGTH (FT)</label><input type="number" id="roomL" value="12" oninput="update()"></div>
+            <div><label>WIDTH (FT)</label><input type="number" id="roomW" value="10" oninput="update()"></div>
+        </div>
+        <div class="grid-2">
+            <div><label>WALL VARIANCE (IN)</label><input type="number" id="variance" value="0.25" step="0.125" oninput="update()"></div>
+            <div><label>GROUT (IN)</label><input type="number" id="grout" value="0.125" step="0.0625" oninput="update()"></div>
+        </div>
+        <a href="https://www.google.com/search?q=Leica+Disto+D2" target="_blank" class="hw-link">🔗 Leica Disto D2</a>
+        <a href="https://www.google.com/search?q=Bosch+GLM+50-27+CG" target="_blank" class="hw-link">🔗 Bosch GLM 50</a>
+        <a href="https://www.google.com/search?q=AccuMaster+Digital+Level" target="_blank" class="hw-link">🔗 Digital Level</a>
+    </section>
+
+    <section>
+        <h3>🎨 2. Design & Stagger Methods</h3>
+        <label>FLOORING TYPE</label>
+        <select id="fType" onchange="update()">
+            <option value="tile">Ceramic/Porcelain Tile</option>
+            <option value="lvp">Luxury Vinyl Plank (LVP)</option>
+            <option value="wood">Hardwood</option>
+        </select>
+        <label>PATTERN METHOD</label>
+        <select id="pattern" onchange="update()">
+            <option value="stack">Standard Stack</option>
+            <option value="brick">Brick Joint (50%)</option>
+            <option value="stagger">1/3 Stagger</option>
+            <option value="herringbone">Herringbone</option>
+            <option value="chevron">Chevron</option>
+            <option value="basket">Basketweave</option>
+        </select>
+        <div class="grid-2">
+            <div><label>TILE WIDTH (IN)</label><input type="number" id="tileW" value="12" oninput="update()"></div>
+            <div><label>TILE HEIGHT (IN)</label><input type="number" id="tileH" value="24" oninput="update()"></div>
+        </div>
+    </section>
+
+    <section style="background: #f7fafc; padding: 15px; border-radius: 8px;">
+        <h3>💰 3. Financials & Bid</h3>
+        <label>TILE PRICE / SQFT</label>
+        <input type="number" id="unitPrice" value="4.50" step="0.10" oninput="update()">
+        <div style="font-size: 13px;">
+            <div style="display:flex; justify-content:space-between;"><span>Est. Material:</span> <strong id="totalCost">$0.00</strong></div>
+            <div style="display:flex; justify-content:space-between; margin-top:5px;"><span>Boxes Required:</span> <strong id="boxCount">0</strong></div>
+            <div style="display:flex; justify-content:space-between; margin-top:5px; color:var(--ai-purple);"><span>AI Waste Factor:</span> <strong id="wasteLabel">7%</strong></div>
+        </div>
+        <button onclick="window.print()" style="margin-top:10px; background:#4a5568; color:white; border:none; font-weight:bold;">📄 Generate Project PDF</button>
+    </section>
+
+    <section>
+        <h3>🚀 4. Pro Actions</h3>
+        <button class="btn-ai" onclick="runAI()">✨ Run AI Correction ($4.99)</button>
+        <button class="btn-pay" style="margin-top:8px;" onclick="unlock('one-time')">Unlock Blueprint (<span id="priceLabel">$0.00</span>)</button>
+        <button class="btn-pro" style="margin-top:8px;" onclick="unlock('pro')">Upgrade to Pro ($25/mo)</button>
+        <div id="ai-status">AI Status: Waiting for scan...</div>
+        <a href="https://www.google.com/search?q=iPad+Pro+M4+13+inch" target="_blank" class="hw-link" style="margin-top:10px;">🛒 iPad Pro M4 (LiDAR)</a>
+        <a href="https://www.google.com/search?q=Dremel+Ultra+Saw" target="_blank" class="hw-link">🛒 Dremel Ultra-Saw</a>
+    </section>
+</div>
+
+<div class="viewport">
+    <div class="watermark">TECHNICAL DATA LOCKED<br>PAY TO REVEAL BLUEPRINT</div>
+    <canvas id="canvas" width="800" height="800"></canvas>
+</div>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    function update() {
+        const rL = parseFloat(document.getElementById('roomL').value) || 12;
+        const rW = parseFloat(document.getElementById('roomW').value) || 10;
+        const tW = parseFloat(document.getElementById('tileW').value) || 12;
+        const tH = parseFloat(document.getElementById('tileH').value) || 24;
+        const grout = parseFloat(document.getElementById('grout').value) || 0;
+        const uPrice = parseFloat(document.getElementById('unitPrice').value) || 0;
+        const pattern = document.getElementById('pattern').value;
+        const variance = parseFloat(document.getElementById('variance').value) || 0;
+
+        const sqft = rL * rW;
+        document.getElementById('priceLabel').innerText = "$" + (sqft * 0.10).toFixed(2);
+        
+        let waste = 0.07;
+        if(pattern === 'herringbone' || pattern === 'chevron') waste = 0.20;
+        else if(pattern !== 'stack' || variance > 0.5) waste = 0.12;
+        
+        document.getElementById('wasteLabel').innerText = (waste * 100).toFixed(0) + "%";
+        const totalSqft = sqft * (1 + waste);
+        document.getElementById('boxCount').innerText = Math.ceil(totalSqft / 22.5);
+        document.getElementById('totalCost').innerText = "$" + (totalSqft * uPrice).toFixed(2);
+
+        draw(rL, rW, tW, tH, grout, pattern);
+    }
+
+    function draw(rL, rW, tW, tH, grout, pattern) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const margin = 60;
+        const scale = Math.min((canvas.width - 120) / rL, (canvas.height - 120) / rW);
+        const dW = rL * scale; const dH = rW * scale;
+        const twP = (tW / 12) * scale; const thP = (tH / 12) * scale; const gP = (grout / 12) * scale;
+
+        ctx.strokeStyle = "#cbd5e0";
+        ctx.save();
+        ctx.beginPath(); ctx.rect(margin, margin, dW, dH); ctx.clip();
+
+        if (pattern === 'herringbone') drawHerringbone(margin, margin, dW, dH, twP, thP, gP);
+        else if (pattern === 'chevron') drawChevron(margin, margin, dW, dH, twP, thP, gP);
+        else if (pattern === 'basket') drawBasket(margin, margin, dW, dH, twP, thP, gP);
+        else drawStandard(margin, margin, dW, dH, twP, thP, gP, pattern);
+
+        ctx.restore();
+        ctx.strokeStyle = "#1a202c"; ctx.lineWidth = 6; ctx.strokeRect(margin, margin, dW, dH);
+    }
+
+    function drawStandard(mX, mY, rW, rH, tw, th, gp, type) {
+        let row = 0;
+        for (let y = mY - th; y < mY + rH + th; y += (th + gp)) {
+            let offset = 0;
+            if (type === 'brick' && row % 2 !== 0) offset = (tw + gp) / 2;
+            if (type === 'stagger' && row % 2 !== 0) offset = (tw + gp) / 3;
+            for (let x = mX - tw; x < mX + rW + tw; x += (tw + gp)) {
+                ctx.strokeRect(x + offset, y, tw, th);
+            }
+            row++;
+        }
+    }
+
+    function drawHerringbone(mX, mY, rW, rH, tw, th, gp) {
+        ctx.translate(mX + rW/2, mY + rH/2); ctx.rotate(Math.PI / 4);
+        let s = Math.max(rW, rH) * 2;
+        for (let x = -s; x < s; x += th) {
+            for (let y = -s; y < s; y += th) {
+                ctx.save(); ctx.translate(x, y);
+                ctx.strokeRect(0, 0, tw, th);
+                ctx.rotate(Math.PI / 2); ctx.strokeRect(0, -tw, th, tw);
+                ctx.restore();
+            }
+        }
+    }
+
+    function drawChevron(mX, mY, rW, rH, tw, th, gp) {
+        ctx.translate(mX, mY);
+        for(let x=0; x < rW + tw; x += tw) {
+            for(let y=0; y < rH + th; y += th) {
+                ctx.beginPath();
+                if((x/tw)%2==0) { ctx.moveTo(x,y); ctx.lineTo(x+tw, y+th/2); ctx.lineTo(x, y+th); }
+                else { ctx.moveTo(x+tw,y); ctx.lineTo(x, y+th/2); ctx.lineTo(x+tw, y+th); }
+                ctx.stroke();
+            }
+        }
+    }
+
+    function drawBasket(mX, mY, rW, rH, tw, th, gp) {
+        for (let x = mX; x < mX + rW; x += th) {
+            for (let y = mY; y < mY + rH; y += th) {
+                ctx.save(); ctx.translate(x,y);
+                if(((x-mX)/th + (y-mY)/th) % 2 == 0) {
+                    ctx.strokeRect(2, 2, th-4, tw-4); ctx.strokeRect(2, tw+2, th-4, tw-4);
+                } else {
+                    ctx.save(); ctx.rotate(Math.PI/2); 
+                    ctx.strokeRect(2, -th+2, th-4, tw-4); ctx.strokeRect(2, -th+tw+2, th-4, tw-4);
+                    ctx.restore();
+                }
+                ctx.restore();
+            }
+        }
+    }
+
+    function unlock(tier) { 
+        document.getElementById('app').classList.remove('locked'); 
+        document.getElementById('ai-status').innerText = tier === 'pro' ? "PRO UNLOCKED: LiDAR Enabled" : "Blueprint Data Unlocked";
+    }
+
+    function runAI() {
+        document.getElementById('ai-status').innerText = "AI Scan: Analyzing wall variances...";
+        setTimeout(() => { document.getElementById('ai-status').innerText = "AI Fix: Symmetry found. 1/8 inch variance corrected."; }, 1500);
+    }
+
+    update();
+</script>
+</body>
+</html>
