@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TileArchitect | Studio Pro Overlay</title>
+    <style>
+        :root { --gold: #C5A059; --dark: #121212; --border: #e0e0e0; }
+        body { font-family: -apple-system, sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: #e5e5e5; overflow: hidden; }
+        @media (min-width: 768px) { body { flex-direction: row; } .sidebar { width: 380px; } }
+        
+        .sidebar { background: white; border-right: 1px solid var(--border); overflow-y: auto; padding: 25px; flex-shrink: 0; box-sizing: border-box; z-index: 10; }
+        .viewport { flex-grow: 1; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        
+        h2 { font-weight: 300; letter-spacing: 2px; text-transform: uppercase; font-size: 16px; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        h3 { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: #999; margin: 20px 0 10px 0; }
+        
+        label { font-size: 9px; font-weight: 700; color: #444; margin-bottom: 5px; display: block; }
+        input, select { width: 100%; padding: 10px; border-radius: 4px; border: 1px solid #eee; margin-bottom: 10px; font-size: 13px; background: #f8f9fa; }
+        
+        .upload-zone { border: 2px dashed var(--gold); padding: 15px; text-align: center; border-radius: 8px; cursor: pointer; margin-bottom: 20px; transition: 0.3s; }
+        .upload-zone:hover { background: #fffcf5; }
+        .upload-zone p { font-size: 10px; color: var(--gold); font-weight: bold; margin: 0; }
+        
+        .cost-card { background: #1a1a1a; color: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .total-price { font-size: 18px; color: var(--gold); border-top: 1px solid #333; padding-top: 10px; margin-top: 10px; }
+        
+        .canvas-container { position: relative; background: white; box-shadow: 0 40px 100px rgba(0,0,0,0.1); }
+        canvas { display: block; z-index: 2; position: relative; }
+        #blueprint-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; z-index: 1; opacity: 0.5; pointer-events: none; }
+        
+        .btn { width: 100%; padding: 12px; border-radius: 4px; border: none; font-size: 10px; font-weight: 800; text-transform: uppercase; cursor: pointer; margin-top: 5px; }
+        .btn-pay { background: var(--gold); color: white; }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h2>Studio<span style="color:var(--gold); font-weight:700;">Architect</span></h2>
+
+    <section>
+        <h3>📂 1. Upload Floor Plan</h3>
+        <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+            <p>CLICK TO UPLOAD BLUEPRINT / PHOTO</p>
+            <input type="file" id="fileInput" hidden accept="image/*" onchange="handleUpload(event)">
+        </div>
+        <label>Blueprint Opacity</label>
+        <input type="range" id="opacity" min="0" max="1" step="0.1" value="0.5" oninput="updateOpacity()">
+    </section>
+
+    <section>
+        <h3>📐 2. Space Dimensions</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div><label>Length (ft)</label><input type="number" id="roomL" value="12" oninput="update()"></div>
+            <div><label>Width (ft)</label><input type="number" id="roomW" value="10" oninput="update()"></div>
+        </div>
+    </section>
+
+    <section>
+        <h3>🎨 3. Design Selection</h3>
+        <label>Pattern Style</label>
+        <select id="pattern" onchange="update()">
+            <option value="stack">Standard Stack</option>
+            <option value="brick">Brick Joint (50%)</option>
+            <option value="herringbone">Herringbone</option>
+            <option value="chevron">Chevron</option>
+            <option value="basket">Basketweave</option>
+        </select>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div><label>Tile W (in)</label><input type="number" id="tileW" value="12" oninput="update()"></div>
+            <div><label>Tile H (in)</label><input type="number" id="tileH" value="24" oninput="update()"></div>
+        </div>
+    </section>
+
+    <div class="cost-card">
+        <label style="color:#aaa;">Price / SqFt</label>
+        <input type="number" id="unitPrice" value="12.00" oninput="update()" style="background:#333; border:none; color:white; font-size:18px;">
+        <div class="total-price">Total: <span id="totalCost">$0.00</span></div>
+    </div>
+
+    <button class="btn btn-pay" onclick="window.print()">📄 Export Design PDF</button>
+</div>
+
+<div class="viewport">
+    <div class="canvas-container" id="container">
+        <img id="blueprint-img" src="" alt="">
+        <canvas id="canvas"></canvas>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const blueprintImg = document.getElementById('blueprint-img');
+
+    function handleUpload(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                blueprintImg.src = e.target.result;
+                blueprintImg.onload = update;
+            }
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function updateOpacity() {
+        blueprintImg.style.opacity = document.getElementById('opacity').value;
+    }
+
+    function update() {
+        const rL = parseFloat(document.getElementById('roomL').value) || 12;
+        const rW = parseFloat(document.getElementById('roomW').value) || 10;
+        const tW = parseFloat(document.getElementById('tileW').value) || 12;
+        const tH = parseFloat(document.getElementById('tileH').value) || 24;
+        const uPrice = parseFloat(document.getElementById('unitPrice').value) || 0;
+        const pattern = document.getElementById('pattern').value;
+
+        // Visual Scaling
+        const containerSize = Math.min(window.innerWidth - 450, window.innerHeight - 100);
+        canvas.width = containerSize;
+        canvas.height = containerSize;
+        document.getElementById('container').style.width = containerSize + 'px';
+        document.getElementById('container').style.height = containerSize + 'px';
+
+        const sqft = rL * rW;
+        let waste = pattern === 'herringbone' ? 1.20 : 1.07;
+        document.getElementById('totalCost').innerText = "$" + (sqft * waste * uPrice).toLocaleString();
+
+        draw(rL, rW, tW, tH, pattern);
+    }
+
+    function draw(rL, rW, tW, tH, pattern) {
+        const scale = Math.min((canvas.width - 40) / rL, (canvas.height - 40) / rW);
+        const dW = rL * scale; const dH = rW * scale;
+        const twP = (tW / 12) * scale; const thP = (tH / 12) * scale;
+        const mX = (canvas.width - dW) / 2; const mY = (canvas.height - dH) / 2;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        ctx.beginPath(); ctx.rect(mX, mY, dW, dH); ctx.clip();
+        ctx.strokeStyle = "rgba(0,0,0,0.2)";
+
+        if (pattern === 'herringbone') drawHerringbone(mX, mY, dW, dH, twP, thP);
+        else if (pattern === 'chevron') drawChevron(mX, mY, dW, dH, twP, thP);
+        else if (pattern === 'basket') drawBasket(mX, mY, dW, dH, twP, thP);
+        else drawStandard(mX, mY, dW, dH, twP, thP, pattern);
+
+        ctx.restore();
+        ctx.strokeStyle = "#121212"; ctx.lineWidth = 2; ctx.strokeRect(mX, mY, dW, dH);
+    }
+
+    function drawStandard(mX, mY, rW, rH, tw, th, type) {
+        for (let y = mY; y < mY + rH + th; y += th) {
+            for (let x = mX - tw; x < mX + rW + tw; x += tw) {
+                ctx.strokeRect(x, y, tw, th);
+            }
+        }
+    }
+
+    function drawHerringbone(mX, mY, rW, rH, tw, th) {
+        ctx.translate(mX + rW/2, mY + rH/2); ctx.rotate(Math.PI / 4);
+        for (let x = -rW; x < rW; x += th) {
+            for (let y = -rH; y < rH; y += th) {
+                ctx.save(); ctx.translate(x, y);
+                ctx.strokeRect(0, 0, tw, th);
+                ctx.rotate(Math.PI / 2); ctx.strokeRect(0, -tw, th, tw);
+                ctx.restore();
+            }
+        }
+    }
+
+    function drawChevron(mX, mY, rW, rH, tw, th) {
+        for(let x=mX-tw; x < mX+rW+tw; x += tw) {
+            for(let y=mY-th; y < mY+rH+th; y += th) {
+                ctx.beginPath();
+                if(Math.floor(x/tw)%2==0) { ctx.moveTo(x,y); ctx.lineTo(x+tw, y+th/2); ctx.lineTo(x, y+th); }
+                else { ctx.moveTo(x+tw,y); ctx.lineTo(x, y+th/2); ctx.lineTo(x+tw, y+th); }
+                ctx.stroke();
+            }
+        }
+    }
+
+    function drawBasket(mX, mY, rW, rH, tw, th) {
+        let s = Math.max(tw, th);
+        for (let x = mX; x < mX + rW; x += s) {
+            for (let y = mY; y < mY + rH; y += s) {
+                ctx.save(); ctx.translate(x,y);
+                if((Math.floor(x/s) + Math.floor(y/s)) % 2 == 0) {
+                    ctx.strokeRect(0, 0, s/2, s); ctx.strokeRect(s/2, 0, s/2, s);
+                } else {
+                    ctx.strokeRect(0, 0, s, s/2); ctx.strokeRect(0, s/2, s, s/2);
+                }
+                ctx.restore();
+            }
+        }
+    }
+
+    window.onresize = update;
+    update();
+</script>
+</body>
+</html>
