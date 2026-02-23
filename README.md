@@ -20,4 +20,4 @@ For maximum precision and to calibrate the AI logic, this software is optimized 
 * **Dremel Ultra-Saw:** Recommended for precision "rescue cuts" identified by the Waste Optimizer.
 
 ## ⚖️ License
-Proprietary - Contact **[Your Name/Email]** for licensing or partnership inquiries.
+Proprietary - Contact **[Megan Henderson/mgnb1025@gmail.com]** for licensing or partnership inquiries.
