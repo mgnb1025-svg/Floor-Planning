@@ -21,3 +21,4 @@ For maximum precision and to calibrate the AI logic, this software is optimized 
 
 ## ⚖️ License
 Proprietary - Contact **[Megan Henderson/mgnb1025@gmail.com]** for licensing or partnership inquiries.
+Copyright (c) 2026 Megan Henderson. All rights reserved. No part of this project may be reproduced or used without express written permission.
