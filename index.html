@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudioArchitect | Pro Workspace v3.0</title>
+    <style>
+        :root { --gold: #C5A059; --dark: #121212; --panel: #1e1e1e; }
+        body { font-family: 'Inter', -apple-system, sans-serif; margin: 0; background: #0a0a0a; color: white; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Fixed Sidebar */
+        .sidebar { width: 350px; background: var(--panel); border-right: 1px solid #333; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; overflow-y: auto; z-index: 100; }
+        
+        /* Robust Workspace */
+        .workspace { flex-grow: 1; position: relative; overflow: auto; display: flex; align-items: center; justify-content: center; background: #111; }
+        .canvas-container { position: relative; display: inline-block; box-shadow: 0 0 80px rgba(0,0,0,0.8); background: #222; min-width: 100px; min-height: 100px; }
+        #blueprint-display { display: block; max-width: 80vw; max-height: 85vh; image-rendering: -webkit-optimize-contrast; }
+        canvas { position: absolute; top: 0; left: 0; z-index: 10; pointer-events: none; }
+
+        /* UI Elements */
+        h2 { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--gold); border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+        .tool-box { background: #252525; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
+        label { display: flex; justify-content: space-between; font-size: 9px; color: #888; text-transform: uppercase; margin-bottom: 8px; font-weight: 700; }
+        label span { color: var(--gold); }
+        
+        input[type="range"] { width: 100%; accent-color: var(--gold); margin-bottom: 10px; }
+        input[type="number"], select, input[type="color"] { width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 8px; border-radius: 4px; font-size: 12px; margin-bottom: 8px; box-sizing: border-box; }
+        
+        .gallery { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 10px; }
+        .gallery-item { width: 45px; height: 45px; border-radius: 4px; border: 2px solid transparent; cursor: pointer; object-fit: cover; background: #333; flex-shrink: 0; }
+        .gallery-item.active { border-color: var(--gold); }
+        .btn-add { border: 1px dashed var(--gold); color: var(--gold); display: flex; align-items: center; justify-content: center; font-size: 20px; width: 45px; height: 45px; cursor: pointer; border-radius: 4px; flex-shrink: 0; }
+        
+        .status-bar { position: absolute; bottom: 15px; left: 365px; font-size: 10px; color: #666; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h2>Studio Manager</h2>
+
+    <div class="tool-box">
+        <label>1. Plan Workspace</label>
+        <div class="gallery" id="gallery">
+            <div class="btn-add" onclick="document.getElementById('fileIn').click()">+</div>
+        </div>
+        <input type="file" id="fileIn" hidden multiple accept="image/*" onchange="handleUpload(event)">
+        
+        <label>Zoom Level <span id="valZoom">100%</span></label>
+        <input type="range" id="zoom" min="0.2" max="2.5" step="0.1" value="1" oninput="rescale()">
+        <label>Grid Opacity <span id="valOpac">50%</span></label>
+        <input type="range" id="opac" min="0" max="1" step="0.1" value="0.5" oninput="draw()">
+    </div>
+
+    <div class="tool-box">
+        <label>2. Flooring & Style</label>
+        <select id="pattern" onchange="draw()">
+            <option value="stack">Standard Stack</option>
+            <option value="brick">Brick Offset (1/2)</option>
+            <option value="herringbone">Herringbone</option>
+            <option value="chevron">Chevron</option>
+        </select>
+        <label>Line Color</label>
+        <input type="color" id="color" value="#C5A059" oninput="draw()">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <div><label>L (in)</label><input type="number" id="tL" value="24" oninput="draw()"></div>
+            <div><label>W (in)</label><input type="number" id="tW" value="12" oninput="draw()"></div>
+        </div>
+    </div>
+
+    <div class="tool-box">
+        <label>3. Adjustment</label>
+        <label>Rotation <span id="valRot">0°</span></label>
+        <input type="range" id="rot" min="0" max="360" value="0" oninput="draw()">
+        <label>Nudge X</label><input type="range" id="ox" min="-500" max="500" value="0" oninput="draw()">
+        <label>Nudge Y</label><input type="range" id="oy" min="-500" max="500" value="0" oninput="draw()">
+    </div>
+</div>
+
+<div class="workspace">
+    <div class="canvas-container" id="container">
+        <img id="blueprint-display" src="" alt="Waiting for upload...">
+        <canvas id="canvas"></canvas>
+    </div>
+    <div class="status-bar" id="statusBar">Ready. Upload a floor plan to begin.</div>
+</div>
+
+<script>
+    const container = document.getElementById('container');
+    const display = document.getElementById('blueprint-display');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const gallery = document.getElementById('gallery');
+
+    // State Tracking
+    let currentImage = null;
+
+    function handleUpload(e) {
+        const files = Array.from(e.target.files);
+        files.forEach((file, i) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const url = ev.target.result;
+                const imgThumb = document.createElement('img');
+                imgThumb.src = url;
+                imgThumb.className = 'gallery-item';
+                imgThumb.onclick = () => activateImage(url, imgThumb);
+                gallery.insertBefore(imgThumb, gallery.lastElementChild);
+                if (!currentImage) activateImage(url, imgThumb);
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function activateImage(url, thumbElement) {
+        document.querySelectorAll('.gallery-item').forEach(i => i.classList.remove('active'));
+        thumbElement.classList.add('active');
+        display.src = url;
+        document.getElementById('statusBar').innerText = "Loading floor plan...";
+    }
+
+    display.onload = () => {
+        // MATCH CANVAS TO IMAGE
+        canvas.width = display.naturalWidth;
+        canvas.height = display.naturalHeight;
+        document.getElementById('statusBar').innerText = `Workspace: ${canvas.width}x${canvas.height}px`;
+        draw();
+    };
+
+    function rescale() {
+        const z = document.getElementById('zoom').value;
+        container.style.transform = `scale(${z})`;
+        document.getElementById('valZoom').innerText = Math.round(z * 100) + "%";
+    }
+
+    function draw() {
+        if (!display.src || display.src.includes('undefined')) return;
+
+        // UI Updates
+        const r = document.getElementById('rot').value;
+        const o = document.getElementById('opac').value;
+        document.getElementById('valRot').innerText = r + "°";
+        document.getElementById('valOpac').innerText = Math.round(o * 100) + "%";
+
+        // Logic
+        const tl = parseFloat(document.getElementById('tL').value) || 12;
+        const tw = parseFloat(document.getElementById('tW').value) || 12;
+        const pat = document.getElementById('pattern').value;
+        const ox = parseFloat(document.getElementById('ox').value) || 0;
+        const oy = parseFloat(document.getElementById('oy').value) || 0;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        
+        // Calibration (assumes ~100px per foot)
+        const pxf = 90; 
+        const tlp = (tl / 12) * pxf;
+        const twp = (tw / 12) * pxf;
+
+        ctx.globalAlpha = o;
+        ctx.strokeStyle = document.getElementById('color').value;
+        ctx.lineWidth = 2;
+
+        ctx.translate(canvas.width / 2 + ox, canvas.height / 2 + oy);
+        ctx.rotate(r * Math.PI / 180);
+
+        const area = Math.max(canvas.width, canvas.height) * 4;
+
+        if (pat === 'herringbone') {
+            for (let x = -area; x < area; x += tlp) {
+                for (let y = -area; y < area; y += tlp) {
+                    ctx.save(); ctx.translate(x, y);
+                    ctx.strokeRect(0, 0, twp, tlp);
+                    ctx.rotate(Math.PI / 2); ctx.strokeRect(0, -twp, tlp, twp);
+                    ctx.restore();
+                }
+            }
+        } else if (pat === 'chevron') {
+            for(let x = -area; x < area; x += twp) {
+                for(let y = -area; y < area; y += tlp) {
+                    ctx.beginPath();
+                    if(Math.floor(x/twp)%2==0) { 
+                        ctx.moveTo(x,y); ctx.lineTo(x+twp, y+tlp/2); ctx.lineTo(x, y+tlp); 
+                    } else { 
+                        ctx.moveTo(x+twp,y); ctx.lineTo(x, y+tlp/2); ctx.lineTo(x+twp, y+tlp); 
+                    }
+                    ctx.stroke();
+                }
+            }
+        } else {
+            let row = 0;
+            for (let y = -area; y < area; y += tlp) {
+                let shift = (pat === 'brick' && row % 2 !== 0) ? twp/2 : 0;
+                for (let x = -area; x < area; x += twp) {
+                    ctx.strokeRect(x + shift, y, twp, tlp);
+                }
+                row++;
+            }
+        }
+        ctx.restore();
+    }
+
+    // Force draw on resize
+    window.onresize = draw;
+</script>
+</body>
+</html>
